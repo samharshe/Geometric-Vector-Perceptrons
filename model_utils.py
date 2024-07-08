@@ -213,7 +213,7 @@ def E3_transform_molecule(molecule: Data, roto_translation: [Tensor, Tensor]) ->
     """
     """
     new_molecule = molecule.clone()
-    new_molecule.pos = torch.matmul(molecule.pos, roto_translation[0])
+    new_molecule.pos = torch.matmul(new_molecule.pos, roto_translation[0])
     new_molecule.pos = new_molecule.pos + roto_translation[1]
     return new_molecule
 
