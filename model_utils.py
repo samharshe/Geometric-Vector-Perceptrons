@@ -188,23 +188,27 @@ def get_random_roto_reflection_matrix() -> Tensor:
     # generate a random rotation using scipy's Rotation module
     rotation = Rotation.random()
     rotation_matrix = torch.tensor(rotation.as_matrix()).float()
-    if np.random.rand() > 1:
+    if np.random.rand() > 0.5:
         roto_reflection_matrix = -rotation_matrix
     else: 
         roto_reflection_matrix = rotation_matrix
-    print(f'Random roto-reflection:\n {roto_reflection_matrix}')
+    print('Random roto-reflection:\n')
+    for row in roto_reflection_matrix:
+        print(f'\t{row[0].item(): 6.3f} {row[1].item(): 6.3f} {row[2].item(): 6.3f}\n')
     return roto_reflection_matrix
 
 def get_random_translation_vector(max_translation=1.0) -> Tensor:
     """
     """
-    # Generate a random translation vector within the range [-max_translation, max_translation]
-    translation = torch.tensor(np.random.uniform(-max_translation, max_translation, size=3)).float()
-    print(f'Random translation:\n {translation}')
+    # generate a random translation vector within the range [-1.0, 1.0]
+    translation = torch.tensor(np.random.uniform(-1, 1, size=3)).float()
+    print('Random translation:\n')
+    for coordinate in translation:
+        print(f'\t{coordinate.item(): 6.3}\n')
     # return translation
     return torch.zeros(3)
 
-def get_random_roto_reflection_translation(max_translation=1.0) -> [Tensor, Tensor]:
+def get_random_roto_reflection_translation() -> [Tensor, Tensor]:
     """
     """
     return [get_random_roto_reflection_matrix(), get_random_translation_vector()]
@@ -213,13 +217,36 @@ def E3_transform_molecule(molecule: Data, roto_translation: [Tensor, Tensor]) ->
     """
     """
     new_molecule = molecule.clone()
-    new_molecule.pos = torch.matmul(new_molecule.pos, roto_translation[0])
+    new_molecule.pos = torch.matmul(roto_translation[0], new_molecule.pos.transpose(0,1)).transpose(0,1)
     new_molecule.pos = new_molecule.pos + roto_translation[1]
     return new_molecule
 
 def E3_transform_force(force_tensor: Tensor, roto_reflection_translation: [Tensor, Tensor]) -> Tensor:
     """
     """
-    force_tensor = torch.matmul(force_tensor, roto_reflection_translation[0])
+    force_tensor = torch.matmul(roto_reflection_translation[0], force_tensor.transpose(0,1)).transpose(0,1)
     force_tensor = force_tensor + roto_reflection_translation[1]
     return force_tensor
+
+def plot_molecules(molecules: [Data], colors: [str], labels:[str]) -> None:
+    """
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    for molecule, color, label in zip(molecules, colors, labels):
+        x, y, z = zip(*molecule.pos)
+
+        ax.scatter(x, y, z, c=color, marker='o', label=label)
+        
+        edge_pair_list = [[i.item(), j.item()] for i, j in zip(molecule.edge_index[0], molecule.edge_index[1])]
+        
+        for edge_pair in edge_pair_list:
+            x_values = [molecule.pos[edge_pair][0][0].item(), molecule.pos[edge_pair][1][0].item()]
+            y_values = [molecule.pos[edge_pair][0][1].item(), molecule.pos[edge_pair][1][1].item()]
+            z_values = [molecule.pos[edge_pair][0][2].item(), molecule.pos[edge_pair][1][2].item()]
+            
+            ax.plot(x_values, y_values, z_values, c=color)
+
+    ax.set_title('3D Atom Positions')
+
+    plt.show()

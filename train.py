@@ -1,29 +1,32 @@
-import torch, sys, wandb
+import torch
+import matplotlib.pyplot as plt
 from torch_geometric.nn.conv import MessagePassing
-from torch_geometric.loader import DataLoader
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from typing import Callable, Dict
 from model_utils import F_loss_fn
+from data_get_utils import get_mini_dataloader
 
-def train(model: MessagePassing, optimizer: Optimizer, loss_fn: Callable, train_dataloader: DataLoader, rho: float, num_epochs: int) -> [float]:
+def mini_train(model: MessagePassing, rho: float, num_items: int, batch_size: int, num_epochs: int) -> None:
     """trains model on dataloader, saves weights of the best-performing model, and logs ongoing results through wandb.
           
     parameters
     ----------
     model : MessagePassing
         self-explanatory.
-    optimizer : Optimizer
-        self-explanatory.
-    loss_fn : Callable
-        self-explanatory.
-    train_dataloader : DataLoader
-        self-explanatory.
     rho : float
         loss = (1-rho)*E_loss + rho*F_loss.
     num_epochs : int
         self-explanatory.
+    batch_size : int
+        self-explanatory.
+    num_epochs: int
+        self-explanatory.
     """
+    optimizer = torch.optim.Adam(model.parameters())
+    loss_fn = torch.nn.MSELoss()
+
+    train_dataloader = get_mini_dataloader(molecule='benzene',
+            num_items=num_items,
+            batch_size=batch_size)
+
     losses = []
     # training loop occurs num_epochs times
     for _ in range(num_epochs):
@@ -61,5 +64,8 @@ def train(model: MessagePassing, optimizer: Optimizer, loss_fn: Callable, train_
             
             # update
             optimizer.step()
-        
-    return losses
+            
+    plt.plot(range(len(losses)), losses)
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.show()
