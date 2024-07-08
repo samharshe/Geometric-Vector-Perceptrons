@@ -1,0 +1,5 @@
+# too big for GitHub
+data/
+
+# gross and annoying
+__pycache__/
