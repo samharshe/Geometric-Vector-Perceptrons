@@ -1,11 +1,13 @@
 import torch, os, sys
 from torch import Tensor
-from torch_geometric.data import Data
+from torch_geometric.datasets import MD17
+from torch_geometric.data import Data, Dataset
+from torch_geometric.loader import DataLoader
+from torch.utils.data import random_split
 from torch_geometric.nn.conv import MessagePassing
 from torch.optim import Optimizer, SGD
 import matplotlib.pyplot as plt
 from typing import Callable
-from data_get_utils import get_mini_dataloader
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -192,19 +194,20 @@ def get_random_roto_reflection_matrix() -> Tensor:
         roto_reflection_matrix = -rotation_matrix
     else: 
         roto_reflection_matrix = rotation_matrix
-    print('Random roto-reflection:\n')
+    print('Random roto-reflection:')
     for row in roto_reflection_matrix:
-        print(f'\t{row[0].item(): 6.3f} {row[1].item(): 6.3f} {row[2].item(): 6.3f}\n')
+        print(f'\t{row[0].item(): 6.3f} {row[1].item(): 6.3f} {row[2].item(): 6.3f}')
     return roto_reflection_matrix
 
 def get_random_translation_vector(max_translation=1.0) -> Tensor:
     """
     """
     # generate a random translation vector within the range [-1.0, 1.0]
-    translation = torch.tensor(np.random.uniform(-1, 1, size=3)).float()
-    print('Random translation:\n')
+    # translation = torch.tensor(np.random.uniform(-1, 1, size=3)).float()
+    translation = torch.zeros(3)
+    print('Random translation:')
     for coordinate in translation:
-        print(f'\t{coordinate.item(): 6.3}\n')
+        print(f'\t{coordinate.item(): 6.3}')
     return translation
 
 def get_random_roto_reflection_translation() -> [Tensor, Tensor]:
@@ -212,12 +215,12 @@ def get_random_roto_reflection_translation() -> [Tensor, Tensor]:
     """
     return [get_random_roto_reflection_matrix(), get_random_translation_vector()]
 
-def E3_transform_molecule(molecule: Data, roto_translation: [Tensor, Tensor]) -> Data:
+def E3_transform_molecule(molecule: Data, roto_reflection_translation: [Tensor, Tensor]) -> Data:
     """
     """
     new_molecule = molecule.clone()
-    new_molecule.pos = torch.matmul(roto_translation[0], new_molecule.pos.transpose(0,1)).transpose(0,1)
-    new_molecule.pos = new_molecule.pos + roto_translation[1]
+    new_molecule.pos = torch.matmul(roto_reflection_translation[0], new_molecule.pos.transpose(0,1)).transpose(0,1)
+    new_molecule.pos = new_molecule.pos + roto_reflection_translation[1]
     return new_molecule
 
 def E3_transform_force(force_tensor: Tensor, roto_reflection_translation: [Tensor, Tensor]) -> Tensor:
@@ -294,3 +297,45 @@ def plot_molecules_with_forces(molecules, forces, colors, labels):
     ax.set_title('3D Atom Positions')
 
     plt.show()
+    
+def get_mini_dataloader(molecule: str, num_items: int, batch_size: int) -> DataLoader:
+    """returns a DataLoader object as specified in function call; especially useful for getting small DataLoader objects to use in experimentation.
+    
+    parameters
+    ----------
+    molecule : str
+        which of molecule datasets (benzene, uracil, aspirin) to fetch.
+    num_items : int
+        self-explanatory. 
+    batch_size : int
+        self-explanatory.
+        
+    returns
+    -------
+    DataLoader object as specified in function call.
+    """
+    # load in the dataset
+    dataset = MD17(root='data/', name=f'{molecule}', pre_transform=None, force_reload=False)
+
+    # make mini_dataset out of dataset
+    mini_dataset, _ = random_split(dataset, [num_items, len(dataset)-num_items])
+    
+    # make min_dataloader out of mini_dataset
+    mini_dataloader = DataLoader(mini_dataset, batch_size=batch_size)
+
+    # return DataLoader
+    return mini_dataloader
+
+def get_molecule(type: str) -> Data:
+    """returns the rirst item in dataset of type of molecule specified in function call.
+    
+    parameters
+    ----------
+    molecule : str
+        molecule whose first instance in dataset will be returned.
+        
+    returns
+    -------
+    first data item in dataset of molecule specified in function call.
+    """
+    return MD17(root='data/', name=f'{type}', pre_transform=None, force_reload=False)[0]

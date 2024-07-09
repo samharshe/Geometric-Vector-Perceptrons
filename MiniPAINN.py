@@ -2,7 +2,7 @@ import torch
 from torch.nn import Module, Linear, SiLU, Embedding
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn import global_add_pool
-from model_utils import bessel_rbf, cosine_cutoff
+from utils import bessel_rbf, cosine_cutoff
 
 # Mini PAINN
 class MPAINNPrediction(Module):
@@ -225,7 +225,7 @@ class Model(Module):
         
         # embedding takes place outside all blocks
         self.embedding = Embedding(118,16)
-        # 3 message/update rounds
+        # 2 message/update rounds
         self.block_1 = MPAINNBlock()
         self.block_2 = MPAINNBlock()
         # s goes through prediction head to give atomwise energy predictions, which are summed to give energy prediction for whole system
