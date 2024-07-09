@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 from torch_geometric.nn.conv import MessagePassing
 from utils import get_mini_dataloader, F_loss_fn
+torch.set_default_dtype(torch.double)
 
 def mini_train(model: MessagePassing, rho: float, num_items: int, batch_size: int, num_epochs: int) -> None:
     """trains model on dataloader, saves weights of the best-performing model, and logs ongoing results through wandb.

@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from typing import Callable
 import numpy as np
 from scipy.spatial.transform import Rotation
+torch.set_default_dtype(torch.double)
 
 def sanity_check(model: MessagePassing, rho:float=1-1e-2, num_items:int=1024, batch_size:int=32, num_epochs:int=10) -> None:
     """puts the model through a very brief training run to check for elementary bugs, making a matplotlib plot of loss.
@@ -141,10 +142,10 @@ def bessel_rbf(x: Tensor, n: int, r_cut: float) -> Tensor:
     vector (Tensor) representing input distance in a Bessel radial basis, as specified in function call.
     """
     # frequency tensor of length n
-    ns = torch.arange(1, n+1).view(1,-1).float()
+    ns = torch.arange(1, n+1).view(1,-1).double()
     
     # output as defined in Bessel radial basis function equation
-    out = torch.div(torch.sin(torch.div(torch.matmul(x,ns) * torch.pi, r_cut)), x)
+    out = torch.div(torch.sin(torch.div(torch.matmul(x.double(),ns) * torch.tensor(torch.pi).double(), torch.tensor(r_cut).double())), x.double())
     
     # return
     return out
@@ -176,7 +177,7 @@ def cosine_cutoff(x: Tensor, r_cut: float) -> Tensor:
     Tensor representing coefficient of input distance under cosine cutoff with `r_cut` as specified in function call.
     """
     # f(0) = 1 and f(r_cut) = 0 smoothly
-    cutoff_distances = 0.5 * (torch.cos(torch.pi * x / r_cut) + 1)
+    cutoff_distances = 0.5 * (torch.cos(torch.pi * x / r_cut) + 1).double()
     
     # truncate everything beyond r_cut
     cutoff_distances[x > r_cut] = 0.0
@@ -189,7 +190,7 @@ def get_random_roto_reflection_matrix() -> Tensor:
     """
     # generate a random rotation using scipy's Rotation module
     rotation = Rotation.random()
-    rotation_matrix = torch.tensor(rotation.as_matrix()).float()
+    rotation_matrix = torch.tensor(rotation.as_matrix()).double()
     if np.random.rand() > 0.5:
         roto_reflection_matrix = -rotation_matrix
     else: 
@@ -203,7 +204,7 @@ def get_random_translation_vector(max_translation=1.0) -> Tensor:
     """
     """
     # generate a random translation vector within the range [-1.0, 1.0]
-    # translation = torch.tensor(np.random.uniform(-1, 1, size=3)).float()
+    # translation = torch.tensor(np.random.uniform(-1, 1, size=3)).double()
     translation = torch.zeros(3)
     print('Random translation:')
     for coordinate in translation:
@@ -339,3 +340,22 @@ def get_molecule(type: str) -> Data:
     first data item in dataset of molecule specified in function call.
     """
     return MD17(root='data/', name=f'{type}', pre_transform=None, force_reload=False)[0]
+
+def make_v0(data: Data) -> Tensor:
+    """
+    """
+    pos = data.pos
+    edge_index = data.edge_index
+    
+    idx1, idx2 = edge_index
+    
+    edge_vectors = pos[idx2] - pos[idx1]
+    
+    num_nodes = pos.size(0)
+    edge_vector_sums = torch.zeros((num_nodes, 3), dtype=pos.dtype)
+    
+    edge_vector_sums = edge_vector_sums.scatter_add(0, idx1.unsqueeze(1).expand(-1, 3), edge_vectors)
+    
+    edge_vector_sums = edge_vector_sums.unsqueeze(2).expand(-1,-1,16)
+    
+    return edge_vector_sums

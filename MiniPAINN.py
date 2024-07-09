@@ -2,11 +2,12 @@ import torch
 from torch.nn import Module, Linear, SiLU, Embedding
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn import global_add_pool
-from utils import bessel_rbf, cosine_cutoff
+from utils import bessel_rbf, cosine_cutoff, make_v0
+torch.set_default_dtype(torch.double)
 
 # Mini PAINN
 class MPAINNPrediction(Module):
-    """Mini PAINN (Polarizable Atomic Interaction Neural Network) as described in https://arxiv.org/pdf/2102.03150, except with embedding dimension 16 instead of 128.
+    """PAINN (Polarizable Atomic Interaction Neural Network) as described in https://arxiv.org/pdf/2102.03150, except with embedding dimension 16 instead of 128.
     """
     def __init__(self):
         super().__init__()
@@ -55,7 +56,7 @@ class MPAINNMessage(MessagePassing):
     def forward(self, x, edge_index, edge_attr1, edge_attr2):
         # message passing to update x, embedding vector
         x = self.propagate(edge_index=edge_index, edge_attr1=edge_attr1, edge_attr2=edge_attr2, x=x)
-        
+
         # return updated embedding
         return x
         
@@ -91,12 +92,12 @@ class MPAINNMessage(MessagePassing):
         split_3 = split[:, -even_third:]
         
         # elementwise multiply first 1/3 with equivariant embedding
-        split_1.unsqueeze_(dim=2)
-        v_j = v_j.view(-1,16,3)
-        v_j = v_j * split_1
+        split_1 = split_1.view(-1,1,16)
+        v_j = v_j.view(-1,3,16)
+        v_j = split_1 * v_j
         
         # add last 1/3 to equivariant embedding
-        v_j += torch.einsum('ni,nj->nij', split_3, unit_edge_vec)
+        # v_j += torch.einsum('ni,nj->nij', split_3, unit_edge_vec)
         
         # middle 1/3 is new invariant embedding
         s_j = split_2
@@ -150,10 +151,10 @@ class MPAINNUpdate(MessagePassing):
         
         # v_V is tensor in second column from left in Figure 2c
         v_V = self.V(v)
-        v_V = v_V.view(v_V.shape[0],16,3)
+        v_V = v_V.view(v_V.shape[0],3,16)
         
         # stack_in is tensor in column 2.5 from left in Figure 2c, immediately after ||•||
-        stack_in = torch.norm(v_V, p=2, dim=2)
+        stack_in = torch.norm(v_V, dim=1)
         
         # concatenate stack_in and s
         stack = torch.cat((stack_in, s), dim=1)
@@ -171,16 +172,16 @@ class MPAINNUpdate(MessagePassing):
         split_3 = split[:,-even_third:]
         
         # first 1/3 is multiplied by equivariant tensor, with each element in split_1 acting on corresponding 3-dimensional vector in v
-        v = v.view(v.shape[0],16,3)
-        v = v * split_1.unsqueeze(dim=2)
+        v = v.view(v.shape[0],3,16)
+        v = split_1.unsqueeze(dim=1) * v
         
         # weird ensum thing for <•_1, •_2> when batch dimensions are in play
         # gives tensor [batch_dim x emb_dim]
-        v_V = torch.einsum('ijk,ijk->ij', v, v_V)
+        v_V = torch.norm(v * v_V, dim=1)
         # elementiwse multiply by split_2
-        v_v = v_V * split_2
+        v_v = split_2 * v_V
         # add split_3
-        v_V = v_V + split_3
+        v_V =  split_3 + v_V
         
         # reshape v for concatenation with v_V
         v = v.view(v.shape[0], -1)
@@ -230,27 +231,28 @@ class Model(Module):
         self.block_2 = MPAINNBlock()
         # s goes through prediction head to give atomwise energy predictions, which are summed to give energy prediction for whole system
         self.prediction = MPAINNPrediction()
-    
+        
     def forward(self, data):
         # get relevant parts from data
         edge_index = data.edge_index
-        pos = data.pos
+        pos = data.pos.clone()
+        pos = pos.double()
         # keep track of gradient of output wrt pos for force calculations
         pos.requires_grad_(True)
         
         # this cannot be done in preprocessing, otherwise force would not be able to be found as negative gradient of energy
-        idx1 = edge_index[0]
-        idx2 = edge_index[1]
-        edge_vec = data.pos[idx1] - data.pos[idx2]
+        idx1, idx2 = edge_index
+        edge_vec = pos[idx1] - pos[idx2]
+        print(edge_vec.dtype)
         edge_vec_length = torch.norm(edge_vec, dim=1)
         unit_edge_vec = torch.div(edge_vec, edge_vec_length.unsqueeze(dim=1))
         
         # initialize equivariant features as 0 vector and invariant features via embedding block
-        v = torch.zeros(data.num_nodes, 16, 3)
+        v = make_v0(data)
         s = self.embedding(data.z)
         
         # construct x by unrolling equivariant features and concatenating invariant features
-        x = torch.cat((v.view(v.shape[0], -1), s), dim=1)
+        x = torch.cat((v.reshape(v.shape[0], -1), s), dim=1)
         
         # 3 message/update rounds
         x = self.block_1(x=x, edge_index=edge_index, edge_attr1=unit_edge_vec, edge_attr2=edge_vec_length)
