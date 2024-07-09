@@ -230,7 +230,7 @@ def E3_transform_force(force_tensor: Tensor, roto_reflection_translation: [Tenso
     force_tensor = torch.matmul(roto_reflection_translation[0], force_tensor.transpose(0,1)).transpose(0,1)
     return force_tensor
 
-def plot_molecules(molecules: [Data], colors: [str], labels: [str], title='Benzene with Bonds and Atomwise Forces') -> None:
+def plot_molecules(molecules: [Data], colors: [str], labels: [str], title='Benzene Molecule with Bonds') -> None:
     """
     """
     fig = plt.figure()
@@ -263,7 +263,7 @@ def plot_molecules(molecules: [Data], colors: [str], labels: [str], title='Benze
 
     plt.show()
 
-def plot_molecules_with_forces(molecules, forces, colors, labels, title='Benzene with Bonds and Atomwise Forces'):
+def plot_molecules_with_forces(molecules, forces, colors, labels, title='Benzene Molecule with Bonds and Atomwise Forces'):
     """
     """
     fig = plt.figure()
@@ -272,7 +272,7 @@ def plot_molecules_with_forces(molecules, forces, colors, labels, title='Benzene
         # makes debugging less annoying when I want to see the molecule after I have put it through the model
         molecule = molecule.detach()
         x, y, z = zip(*molecule.pos)
-        dir_x, dir_y, dir_z = zip(*force)
+        dir_x, dir_y, dir_z = zip(*force*5)
 
         ax.scatter(x, y, z, c=color[0], marker='o', label=label)
         
@@ -340,21 +340,39 @@ def get_molecule(type: str) -> Data:
     """
     return MD17(root='data/', name=f'{type}', pre_transform=None, force_reload=False)[0]
 
-def make_v0(data: Data) -> Tensor:
-    """
-    """
-    pos = data.pos
-    edge_index = data.edge_index
+def make_v0(pos: Tensor, edge_index: Tensor, emb_dim: int) -> Tensor:
+    """returns [num_nodes x 3 x emb_dim] tensor, where each node's tensor is sum of all its outgoing edge vectors copied `emb_dim` times.
     
+    note that `pos` is passed as a parameter into function call so gradients of this operation can be included in computational graph for backprop.
+    
+    parameters
+    ----------
+    pos : Tensor
+        self-explanatory.
+    edge_index : Tensor
+        self-explanatory.
+        
+    returns
+    -------
+    [num_nodes x 3 x emb_dim] tensor, where each node's tensor is sum of all its outgoing edge vectors copied `emb_dim` times.
+    """
+    # unpack edge_index
     idx1, idx2 = edge_index
     
+    # vectorized calculation of edge vectors
     edge_vectors = pos[idx2] - pos[idx1]
     
+    # determines dimension 0 of output tensor
     num_nodes = pos.size(0)
-    edge_vector_sums = torch.zeros((num_nodes, 3), dtype=pos.dtype)
     
-    edge_vector_sums = edge_vector_sums.scatter_add(0, idx1.unsqueeze(1).expand(-1, 3), edge_vectors)
+    # make container for outgoing vector sums
+    outgoing_edge_vector_sums = torch.zeros((num_nodes, 3), dtype=pos.dtype)
     
-    edge_vector_sums = edge_vector_sums.unsqueeze(2).expand(-1,-1,16)
+    # fancy PyTorch adding function
+    outgoing_edge_vector_sums = outgoing_edge_vector_sums.scatter_add(0, idx1.unsqueeze(1).expand(-1, 3), edge_vectors) # EQUIVARIANT OPERATION: adding equivariant vectors
     
-    return edge_vector_sums
+    # copy over emb_dim
+    v0 = outgoing_edge_vector_sums.unsqueeze(2).expand(-1,-1,emb_dim)
+    
+    # return result
+    return v0

@@ -94,9 +94,9 @@ class MPAINNMessage(MessagePassing):
         # elementwise multiply first 1/3 with equivariant embedding
         split_1 = split_1.view(-1,1,16)
         v_j = v_j.view(-1,3,16)
-        v_j = split_1 * v_j
+        v_j = split_1 * v_j # EQUIVARIANT OPERATION: scalar multiplication
         
-        # add last 1/3 to equivariant embedding
+        # last 1/3 is not added because that would jeopardize equivariance
         # v_j += torch.einsum('ni,nj->nij', split_3, unit_edge_vec)
         
         # middle 1/3 is new invariant embedding
@@ -147,7 +147,7 @@ class MPAINNUpdate(MessagePassing):
         
         # change dimensions of v to allow it to be put through linear layer
         v = v.view(v.shape[0],3,16)
-        v = self.U(v)
+        v = self.U(v) # EQUIVARIANT OPERATION: linear layer without bias is just more scalar multiplication
         
         # v_V is tensor in second column from left in Figure 2c
         v_V = self.V(v)
@@ -173,7 +173,7 @@ class MPAINNUpdate(MessagePassing):
         
         # first 1/3 is multiplied by equivariant tensor, with each element in split_1 acting on corresponding 3-dimensional vector in v
         v = v.view(v.shape[0],3,16)
-        v = split_1.unsqueeze(dim=1) * v
+        v = split_1.unsqueeze(dim=1) * v # EQUIVARIANT OPERATION: more scalar multiplication
         
         # weird ensum thing for <•_1, •_2> when batch dimensions are in play
         # gives tensor [batch_dim x emb_dim]
@@ -247,7 +247,7 @@ class Model(Module):
         unit_edge_vec = torch.div(edge_vec, edge_vec_length.unsqueeze(dim=1))
         
         # initialize equivariant features as 0 vector and invariant features via embedding block
-        v = make_v0(data)
+        v = make_v0(pos=pos, edge_index=edge_index, emb_dim=16)
         s = self.embedding(data.z)
         
         # construct x by unrolling equivariant features and concatenating invariant features
