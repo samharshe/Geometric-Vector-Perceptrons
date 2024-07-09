@@ -95,7 +95,7 @@ class MPAINNMessage(MessagePassing):
         split_1 = split_1.view(-1,1,16)
         v_j = v_j.view(-1,3,16)
         v_j = split_1 * v_j # EQUIVARIANT OPERATION: scalar multiplication
-        
+
         # last 1/3 is not added because that would jeopardize equivariance
         # v_j += torch.einsum('ni,nj->nij', split_3, unit_edge_vec)
         
@@ -174,7 +174,7 @@ class MPAINNUpdate(MessagePassing):
         # first 1/3 is multiplied by equivariant tensor, with each element in split_1 acting on corresponding 3-dimensional vector in v
         v = v.view(v.shape[0],3,16)
         v = split_1.unsqueeze(dim=1) * v # EQUIVARIANT OPERATION: more scalar multiplication
-        
+
         # weird ensum thing for <•_1, •_2> when batch dimensions are in play
         # gives tensor [batch_dim x emb_dim]
         v_V = torch.norm(v * v_V, dim=1)
