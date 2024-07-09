@@ -7,7 +7,7 @@ torch.set_default_dtype(torch.double)
 
 # Mini PAINN
 class MPAINNPrediction(Module):
-    """PAINN (Polarizable Atomic Interaction Neural Network) as described in https://arxiv.org/pdf/2102.03150, except with embedding dimension 16 instead of 128.
+    """PAINN (Polarizable Atomic Interaction Neural Network) as described in https://arxiv.org/pdf/2102.03150, except with embedding dimension 16 instead of 128, and with 2 blocks instead of 3.
     """
     def __init__(self):
         super().__init__()
@@ -243,7 +243,6 @@ class Model(Module):
         # this cannot be done in preprocessing, otherwise force would not be able to be found as negative gradient of energy
         idx1, idx2 = edge_index
         edge_vec = pos[idx1] - pos[idx2]
-        print(edge_vec.dtype)
         edge_vec_length = torch.norm(edge_vec, dim=1)
         unit_edge_vec = torch.div(edge_vec, edge_vec_length.unsqueeze(dim=1))
         
@@ -254,7 +253,7 @@ class Model(Module):
         # construct x by unrolling equivariant features and concatenating invariant features
         x = torch.cat((v.reshape(v.shape[0], -1), s), dim=1)
         
-        # 3 message/update rounds
+        # 2 message/update rounds
         x = self.block_1(x=x, edge_index=edge_index, edge_attr1=unit_edge_vec, edge_attr2=edge_vec_length)
         x = self.block_2(x=x, edge_index=edge_index, edge_attr1=unit_edge_vec, edge_attr2=edge_vec_length)
         

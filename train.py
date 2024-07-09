@@ -40,8 +40,8 @@ def mini_train(model: MessagePassing, rho: float, num_items: int, batch_size: in
             optimizer.zero_grad()
 
             # target values
-            E = data.energy
-            F = data.force
+            E = data.energy.clone().double()
+            F = data.force.clone().double()
             
             # predictions from the model
             E_hat, F_hat = model(data)
@@ -55,7 +55,7 @@ def mini_train(model: MessagePassing, rho: float, num_items: int, batch_size: in
             
             # canonical loss
             loss = (1-rho)*E_loss + rho*F_loss
-        
+            
             # calculate gradients
             loss.backward()
             

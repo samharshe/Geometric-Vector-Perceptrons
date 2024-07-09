@@ -204,8 +204,8 @@ def get_random_translation_vector(max_translation=1.0) -> Tensor:
     """
     """
     # generate a random translation vector within the range [-1.0, 1.0]
-    # translation = torch.tensor(np.random.uniform(-1, 1, size=3)).double()
-    translation = torch.zeros(3)
+    translation = torch.tensor(np.random.uniform(-1, 1, size=3)).double()
+    # translation = torch.zeros(3)
     print('Random translation:')
     for coordinate in translation:
         print(f'\t{coordinate.item(): 6.3}')
@@ -220,7 +220,7 @@ def E3_transform_molecule(molecule: Data, roto_reflection_translation: [Tensor, 
     """
     """
     new_molecule = molecule.clone()
-    new_molecule.pos = torch.matmul(roto_reflection_translation[0], new_molecule.pos.transpose(0,1)).transpose(0,1)
+    new_molecule.pos = torch.matmul(roto_reflection_translation[0], new_molecule.pos.double().transpose(0,1)).transpose(0,1)
     new_molecule.pos = new_molecule.pos + roto_reflection_translation[1]
     return new_molecule
 
@@ -228,10 +228,9 @@ def E3_transform_force(force_tensor: Tensor, roto_reflection_translation: [Tenso
     """
     """
     force_tensor = torch.matmul(roto_reflection_translation[0], force_tensor.transpose(0,1)).transpose(0,1)
-    force_tensor = force_tensor + roto_reflection_translation[1]
     return force_tensor
 
-def plot_molecules(molecules: [Data], colors: [str], labels: [str]) -> None:
+def plot_molecules(molecules: [Data], colors: [str], labels: [str], title='Benzene with Bonds and Atomwise Forces') -> None:
     """
     """
     fig = plt.figure()
@@ -260,11 +259,11 @@ def plot_molecules(molecules: [Data], colors: [str], labels: [str]) -> None:
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     
-    ax.set_title('3D Atom Positions')
+    ax.set_title(title)
 
     plt.show()
 
-def plot_molecules_with_forces(molecules, forces, colors, labels):
+def plot_molecules_with_forces(molecules, forces, colors, labels, title='Benzene with Bonds and Atomwise Forces'):
     """
     """
     fig = plt.figure()
@@ -286,7 +285,7 @@ def plot_molecules_with_forces(molecules, forces, colors, labels):
             
             ax.plot(x_values, y_values, z_values, c=color[0])
         
-        ax.quiver(x, y, z, dir_x, dir_y, dir_z, normalize=False, color=color[1], arrow_length_ratio=0.1, pivot='tip')
+        ax.quiver(x, y, z, dir_x, dir_y, dir_z, normalize=False, color=color[1], arrow_length_ratio=0.5, pivot='tip')
 
     if labels != ['']:
         ax.legend()
@@ -295,7 +294,7 @@ def plot_molecules_with_forces(molecules, forces, colors, labels):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     
-    ax.set_title('3D Atom Positions')
+    ax.set_title(title)
 
     plt.show()
     
