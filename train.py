@@ -68,4 +68,5 @@ def mini_train(model: MessagePassing, rho: float, num_items: int, batch_size: in
     plt.plot(range(len(losses)), losses)
     plt.xlabel('Batch')
     plt.ylabel('Loss')
+    plt.title('Training Batchwise Losses')
     plt.show()
