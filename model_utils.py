@@ -205,8 +205,7 @@ def get_random_translation_vector(max_translation=1.0) -> Tensor:
     print('Random translation:\n')
     for coordinate in translation:
         print(f'\t{coordinate.item(): 6.3}\n')
-    # return translation
-    return torch.zeros(3)
+    return translation
 
 def get_random_roto_reflection_translation() -> [Tensor, Tensor]:
     """
@@ -228,14 +227,17 @@ def E3_transform_force(force_tensor: Tensor, roto_reflection_translation: [Tenso
     force_tensor = force_tensor + roto_reflection_translation[1]
     return force_tensor
 
-def plot_molecules(molecules: [Data], colors: [str], labels:[str]) -> None:
+def plot_molecules(molecules: [Data], colors: [str], labels: [str]) -> None:
     """
     """
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    
     for molecule, color, label in zip(molecules, colors, labels):
+        # makes debugging less annoying when I want to see the molecule after I have put it through the model
+        molecule = molecule.detach()
         x, y, z = zip(*molecule.pos)
-
+        
         ax.scatter(x, y, z, c=color, marker='o', label=label)
         
         edge_pair_list = [[i.item(), j.item()] for i, j in zip(molecule.edge_index[0], molecule.edge_index[1])]
@@ -247,6 +249,48 @@ def plot_molecules(molecules: [Data], colors: [str], labels:[str]) -> None:
             
             ax.plot(x_values, y_values, z_values, c=color)
 
+    if labels != ['']:
+        ax.legend()
+        
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    
+    ax.set_title('3D Atom Positions')
+
+    plt.show()
+
+def plot_molecules_with_forces(molecules, forces, colors, labels):
+    """
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    for molecule, force, color, label in zip(molecules, forces, colors, labels):
+        # makes debugging less annoying when I want to see the molecule after I have put it through the model
+        molecule = molecule.detach()
+        x, y, z = zip(*molecule.pos)
+        dir_x, dir_y, dir_z = zip(*force)
+
+        ax.scatter(x, y, z, c=color[0], marker='o', label=label)
+        
+        edge_pair_list = [[i.item(), j.item()] for i, j in zip(molecule.edge_index[0], molecule.edge_index[1])]
+        
+        for edge_pair in edge_pair_list:
+            x_values = [molecule.pos[edge_pair][0][0].item(), molecule.pos[edge_pair][1][0].item()]
+            y_values = [molecule.pos[edge_pair][0][1].item(), molecule.pos[edge_pair][1][1].item()]
+            z_values = [molecule.pos[edge_pair][0][2].item(), molecule.pos[edge_pair][1][2].item()]
+            
+            ax.plot(x_values, y_values, z_values, c=color[0])
+        
+        ax.quiver(x, y, z, dir_x, dir_y, dir_z, normalize=False, color=color[1], arrow_length_ratio=0.1, pivot='tip')
+
+    if labels != ['']:
+        ax.legend()
+        
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    
     ax.set_title('3D Atom Positions')
 
     plt.show()
