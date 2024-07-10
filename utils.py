@@ -272,7 +272,7 @@ def plot_molecules_with_forces(molecules, forces, colors, labels, title='Benzene
         # makes debugging less annoying when I want to see the molecule after I have put it through the model
         molecule = molecule.detach()
         x, y, z = zip(*molecule.pos)
-        dir_x, dir_y, dir_z = zip(*force)
+        dir_x, dir_y, dir_z = zip(*force*3)
 
         ax.scatter(x, y, z, c=color[0], marker='o', label=label)
         
