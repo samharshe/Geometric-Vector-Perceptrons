@@ -3,3 +3,4 @@ data/
 
 # gross and annoying
 __pycache__/
+.DS_Store
